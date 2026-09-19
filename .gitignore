@@ -1,0 +1,13 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env - ห้าม commit API Key เด็ดขาด
+.env
+.env.local
+*.key
+
+# temp
+*.log

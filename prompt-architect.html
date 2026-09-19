@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prompt Architect Pro — ระบบสร้าง Master Prompt อัจฉริยะ</title>
+<style>
+:root{
+  --bg:#0a0e16; --panel:#101828; --panel2:#0c1322; --border:#1f2b3e;
+  --text:#e2e8f0; --muted:#8fa0b8; --accent:#6366f1; --accent2:#a78bfa;
+  --ok:#34d399; --run:#fbbf24; --err:#f87171;
+  --mono:'Cascadia Code','Fira Code',Consolas,'Courier New',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:radial-gradient(1200px 600px at 85% -10%,#1a2140 0%,var(--bg) 55%);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif;min-height:100vh;line-height:1.6}
+header{max-width:1500px;margin:0 auto;padding:26px 28px 14px}
+.logo{font-size:26px;font-weight:800;background:linear-gradient(90deg,#818cf8,#c084fc,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.subtitle{color:var(--muted);font-size:14px;margin-top:2px}
+main{display:grid;grid-template-columns:430px 1fr;gap:20px;max-width:1500px;margin:0 auto;padding:6px 28px 46px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:22px}
+.panel h2{font-size:16px;margin-bottom:14px;color:var(--accent2);letter-spacing:.3px}
+label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+label .req{color:var(--err)}
+input[type=text],input[type=password],textarea,select{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;transition:border .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;font-family:inherit}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.checks label{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:var(--text);background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer}
+.checks input{accent-color:var(--accent)}
+.remember{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:var(--text);cursor:pointer}
+.divider{border:none;border-top:1px dashed var(--border);margin:22px 0 8px}
+.btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s;margin-top:18px}
+.btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff}
+.btn-primary:hover:not(:disabled){filter:brightness(1.15);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.linklike{background:none;border:none;color:var(--accent2);font-size:12.5px;cursor:pointer;text-decoration:underline;padding:0;margin-top:8px}
+/* ---------- Pipeline ---------- */
+.psteps{display:flex;flex-direction:column;gap:0;margin-bottom:18px}
+.pstep{display:flex;gap:14px;position:relative;padding-bottom:18px}
+.pstep:not(:last-child)::before{content:'';position:absolute;left:17px;top:38px;bottom:0;width:2px;background:var(--border)}
+.pstep-dot{width:36px;height:36px;border-radius:50%;background:var(--panel2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0;z-index:1;transition:.2s}
+.pstep.waiting .pstep-dot{color:var(--muted)}
+.pstep.running .pstep-dot{border-color:var(--run);color:var(--run);animation:pulse 1.2s infinite}
+.pstep.done .pstep-dot{border-color:var(--ok);color:#06281c;background:var(--ok)}
+.pstep.error .pstep-dot{border-color:var(--err);color:var(--err)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.35)}50%{box-shadow:0 0 0 8px rgba(251,191,36,0)}}
+.pstep-main{flex:1;min-width:0}
+.pstep-title{font-size:14.5px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pstep-status{font-size:11.5px;font-weight:600;padding:2px 10px;border-radius:20px;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.pstep.running .pstep-status{color:var(--run);border-color:var(--run)}
+.pstep.done .pstep-status{color:var(--ok);border-color:var(--ok)}
+.pstep.error .pstep-status{color:var(--err);border-color:var(--err)}
+.pstep-desc{font-size:12.5px;color:var(--muted);margin-top:2px}
+details.pout{margin-top:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+details.pout summary{padding:7px 12px;font-size:12.5px;color:var(--accent2);cursor:pointer;user-select:none}
+details.pout pre{max-height:260px;overflow:auto;padding:12px;font-family:var(--mono);font-size:11.5px;color:#c9d4e5;white-space:pre-wrap;border-top:1px solid var(--border)}
+/* ---------- Terminal ---------- */
+.terminal{background:#05080f;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.tbar{display:flex;align-items:center;gap:7px;background:#0b1120;padding:9px 14px;border-bottom:1px solid var(--border)}
+.tdot{width:11px;height:11px;border-radius:50%}
+.tdot.r{background:#ff5f57}.tdot.y{background:#febc2e}.tdot.g{background:#28c840}
+.tname{margin-left:8px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.tbody{height:430px;overflow:auto;padding:16px;font-family:var(--mono);font-size:12.8px;white-space:pre-wrap;word-break:break-word;color:#d7e2f2}
+.tbody .logline{color:var(--muted);margin-bottom:4px}
+.tbody .logline b{color:var(--accent2)}
+.tbody .errline{color:var(--err)}
+.tbody .okline{color:var(--ok)}
+.meta{font-size:12px;color:var(--muted);margin-top:8px;text-align:right}
+/* ---------- Actions / Guide ---------- */
+.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.actions .btn{width:auto;flex:1;min-width:150px;margin-top:0}
+.btn-ghost{background:var(--panel2);border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent)}
+.guide{margin-top:18px;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(167,139,250,.06));border:1px solid var(--border);border-radius:12px;padding:18px}
+.guide h3{font-size:14.5px;color:var(--accent2);margin-bottom:10px}
+.guide ol{margin-left:20px;font-size:13.5px;display:flex;flex-direction:column;gap:7px}
+.guide .next{display:inline-block;background:var(--accent);color:#fff;font-family:var(--mono);font-size:12px;padding:1px 10px;border-radius:6px;font-weight:700}
+/* ---------- Toast ---------- */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a2438;border:1px solid var(--accent);color:var(--text);padding:11px 22px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;z-index:99;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:0 20px 30px}
+@media(max-width:980px){main{grid-template-columns:1fr}.tbody{height:320px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡ Prompt Architect Pro</div>
+  <div class="subtitle">ระบบคิด → วิเคราะห์ → วางแผน ก่อนสังเคราะห์ Master Prompt เพื่อสั่งงาน AI สร้างระบบ Google Apps Script 3 ไฟล์</div>
+</header>
+
+<main>
+  <!-- ══════════ ฝั่งซ้าย: ฟอร์มกรอกข้อมูล ══════════ -->
+  <section class="panel">
+    <h2>📋 ข้อมูลระบบที่ต้องการสร้าง</h2>
+
+    <label>ชื่อระบบ <span class="req">*</span></label>
+    <input type="text" id="systemName" placeholder="เช่น ระบบยืม-คืนหนังสือห้องสมุดโรงเรียน">
+
+    <label>กลุ่มผู้ใช้งาน <span class="req">*</span></label>
+    <input type="text" id="users" placeholder="เช่น ครูห้องสมุด, นักเรียน, ผู้บริหาร">
+
+    <label>คำอธิบายการทำงานของระบบ <span class="req">*</span></label>
+    <textarea id="description" rows="6" placeholder="อธิบาย Flow การทำงานให้ละเอียด เช่น ใครทำอะไร ระบบบันทึกอะไร แสดงผลอย่างไร..."></textarea>
+    <button class="linklike" id="sampleBtn" type="button">💡 ใส่ข้อมูลตัวอย่าง (ระบบห้องสมุด)</button>
+
+    <label>ระดับความซับซ้อนของระบบ</label>
+    <select id="complexity">
+      <option value="basic">พื้นฐาน — CRUD เรียบง่าย เหมาะผู้เริ่มต้น</option>
+      <option value="standard" selected>มาตรฐาน — ครบเครื่อง มี Validation + Error Handling</option>
+      <option value="advanced">สูง — หลายบทบาทผู้ใช้ มี Workflow และรายงาน</option>
+      <option value="expert">สูงมาก — ระดับองค์กร มี Audit Log และสถิติเชิงลึก</option>
+    </select>
+
+    <label>ฟีเจอร์เสริมที่ต้องมี</label>
+    <div class="checks">
+      <label><input type="checkbox" class="feature-check" value="ระบบ Login แยกสิทธิ์ผู้ใช้หลายระดับ"> Login แยกสิทธิ์</label>
+      <label><input type="checkbox" class="feature-check" value="เมนู Sidebar นำทาง"> Sidebar นำทาง</label>
+      <label><input type="checkbox" class="feature-check" value="หน้า Dashboard สรุปสถิติและกราฟ"> Dashboard + กราฟ</label>
+      <label><input type="checkbox" class="feature-check" value="รองรับการใช้งานบนมือถือ (Responsive)"> Responsive</label>
+      <label><input type="checkbox" class="feature-check" value="ระบบค้นหา กรอง และเรียงลำดับข้อมูล"> ค้นหา/กรอง/เรียง</label>
+      <label><input type="checkbox" class="feature-check" value="ส่งออกรายงานเป็นไฟล์ Excel/CSV"> Export Excel/CSV</label>
+      <label><input type="checkbox" class="feature-check" value="ส่งอีเมลแจ้งเตือนอัตโนมัติ"> แจ้งเตือนอีเมล</label>
+      <label><input type="checkbox" class="feature-check" value="บันทึกประวัติการใช้งาน (Audit Log)"> Audit Log</label>
+    </div>
+
+    <label>ปริมาณข้อมูลสมมุติ (Mock Data) ที่ mockdata.gs ต้องสร้าง</label>
+    <select id="mockRows">
+      <option value="50">~50 ระเบียน</option>
+      <option value="100" selected>~100 ระเบียน</option>
+      <option value="300">~300 ระเบียน</option>
+      <option value="500">~500 ระเบียน</option>
+    </select>
+
+    <hr class="divider">
+    <h2>⚙️ การตั้งค่า AI (Gemini)</h2>
+
+    <label>Gemini API Key <span class="req">*</span></label>
+    <input type="password" id="apiKey" placeholder="AIza... (ขอได้ที่ aistudio.google.com)">
+    <label class="remember"><input type="checkbox" id="rememberKey"> จำ API Key ไว้บนเครื่องนี้ (localStorage)</label>
+    <div class="hint">Key ถูกใช้จากเบราว์เซอร์ของคุณโดยตรง ไม่มีการส่งไปเซิร์ฟเวอร์อื่น</div>
+
+    <label>โมเดลที่ใช้ประมวลผล</label>
+    <select id="model">
+      <option value="gemini-2.5-pro">Gemini 2.5 Pro — ฉลาดที่สุด เหมาะงานซับซ้อน</option>
+      <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash — เร็ว ประหยัด ฉลาดพอ</option>
+    </select>
+
+    <button class="btn btn-primary" id="generateBtn" type="button">🚀 เริ่มกระบวนการสร้าง Master Prompt</button>
+  </section>
+
+  <!-- ══════════ ฝั่งขวา: กระบวนการคิด + ผลลัพธ์ ══════════ -->
+  <section class="panel">
+    <h2>🧠 กระบวนการคิดของ AI (Thinking Pipeline)</h2>
+
+    <div class="psteps">
+      <div class="pstep waiting" id="step1">
+        <div class="pstep-dot">1</div>
+        <div class="pstep-main">
+          <div class="pstep-title">🔍 วิเคราะห์ความต้องการ <span class="pstep-status" id="status1">รอคำสั่ง</span></div>
+          <div class="pstep-desc">AI สืบเสาะห์ความต้องการที่แฝงอยู่ เอนทิตี้ข้อมูล เวิร์กโฟลว์ และ Edge Cases</div>
+          <details class="pout" id="out1" style="display:none"><summary>📄 ดูรายงานวิเคราะห์</summary><pre id="pre1"></pre></details>
+        </div>
+      </div>
+      <div class="pstep waiting" id="step2">
+        <div class="pstep-dot">2</div>
+        <div class="pstep-main">
+          <div class="pstep-title">🏗️ ออกแบบสถาปัตยกรรม <span class="pstep-status" id="status2">รอคำสั่ง</span></div>
+          <div class="pstep-desc">ออกแบบพิมพ์เขียว 3 ไฟล์: ฟังก์ชันใน Code.gs / หน้าจอใน Index.html / ข้อมูลใน mockdata.gs</div>
+          <details class="pout" id="out2" style="display:none"><summary>📐 ดูพิมพ์เขียวสถาปัตยกรรม</summary><pre id="pre2"></pre></details>
+        </div>
+      </div>
+      <div class="pstep waiting" id="step3">
+        <div class="pstep-dot">3</div>
+        <div class="pstep-main">
+          <div class="pstep-title">✍️ สังเคราะห์ Master Prompt <span class="pstep-status" id="status3">รอคำสั่ง</span></div>
+          <div class="pstep-desc">รวมทุกอย่างเป็นคำสั่งเดียว พร้อมพิธีส่งมอบ 3 ไฟล์ด้วยคำสั่ง "ต่อไป"</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="terminal">
+      <div class="tbar"><span class="tdot r"></span><span class="tdot y"></span><span class="tdot g"></span><span class="tname">master-prompt.txt</span></div>
+      <div class="tbody" id="tbody"><span class="logline">ยังไม่มีผลลัพธ์ — กรอกข้อมูลด้านซ้ายแล้วกด <b>"เริ่มกระบวนการสร้าง Master Prompt"</b></span></div>
+    </div>
+    <div class="meta" id="meta"></div>
+
+    <div class="actions" id="actions" style="display:none">
+      <button class="btn btn-primary" id="copyBtn" type="button">📋 คัดลอก Master Prompt</button>
+      <button class="btn btn-ghost" id="downloadBtn" type="button">⬇️ ดาวน์โหลด .txt</button>
+      <button class="btn btn-ghost" id="resetBtn" type="button">🧹 เริ่มใหม่</button>
+    </div>
+
+    <div class="guide" id="guide" style="display:none">
+      <h3>🎓 วิธีใช้ Master Prompt (สอนนักเรียนทำตามได้เป๊ะ)</h3>
+      <ol>
+        <li>เปิดแชท AI (Gemini / ChatGPT / Claude) แล้ว<b>วาง Master Prompt</b> ที่คัดลอกไป</li>
+        <li>AI จะส่ง <b>ไฟล์ที่ 1: Code.gs</b> ทันที (โค้ดเต็ม 100%) → คัดลอกไปบันทึก</li>
+        <li>พิมพ์ <span class="next">ต่อไป</span> → AI จะส่ง <b>ไฟล์ที่ 2: Index.html</b></li>
+        <li>พิมพ์ <span class="next">ต่อไป</span> → AI จะส่ง <b>ไฟล์ที่ 3: mockdata.gs</b> (สร้างข้อมูลสมมุติ)</li>
+        <li>นำ 3 ไฟล์ไปวางในโปรเจกต์ Google Apps Script → <b>รัน mockdata.gs ก่อน</b> แล้วจึง Deploy เป็น Web App</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer>Prompt Architect Pro — ไฟล์เดียว HTML/CSS/JS เรียก Gemini API จากเบราว์เซอร์โดยตรง | พัฒนาเพื่อการเรียนการสอน</footer>
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   Prompt Architect Pro — สถาปัตยกรรม 3 เฟส (Think → Plan → Synthesize)
+   ═══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const state = { running:false, analysis:'', plan:'', master:'' };
+
+/* ---------- เฟสที่ 1: นักวิเคราะห์ระบบอาวุโส ---------- */
+const PHASE1_SYSTEM = [
+'คุณคือ "นักวิเคราะห์ระบบอาวุโส" (Senior Systems Analyst) เชี่ยวชาญการวิเคราะห์ความต้องการเพื่อพัฒนาระบบบน Google Apps Script',
+'หน้าที่ของคุณ: รับข้อมูลความต้องการจากผู้ใช้ แล้ววิเคราะห์อย่างลึกซึ้ง ครบถ้วน ออกมาเป็น "รายงานวิเคราะห์ความต้องการ" ภาษาไทย ตามหัวข้อต่อไปนี้เป๊ะ:',
+'1. สรุปปัญหาและวัตถุประสงค์ของระบบ',
+'2. บทบาทผู้ใช้งานแต่ละกลุ่ม พร้อมสิทธิ์การเข้าถึง (ใครทำอะไรได้บ้าง)',
+'3. เอนทิตี้ข้อมูลหลัก (Data Entities): ชื่อ ฟิลด์ ชนิดข้อมูล และความสัมพันธ์ระหว่างกัน',
+'4. เวิร์กโฟลว์การทำงานหลักทุก Flow แบบละเอียดทีละขั้นตอน (ผู้ใช้ทำอะไร → ระบบตอบสนองอย่างไร)',
+'5. Edge Cases และข้อผิดพลาดที่ระบบต้องจัดการให้ครอบคลุม',
+'6. ข้อกำหนดด้านความปลอดภัยและการตรวจสอบสิทธิ์',
+'7. ประเมินความซับซ้อนโดยรวม และสมมติฐานสำคัญที่ใช้',
+'เขียนแบบมืออาชีพ กระชับ ชัดเจน ใช้ Markdown และห้ามละเว้นหัวข้อใด'
+].join('\n');
+
+/* ---------- เฟสที่ 2: สถาปนิกซอฟต์แวร์อาวุโส ---------- */
+const PHASE2_SYSTEM = [
+'คุณคือ "สถาปนิกซอฟต์แวร์อาวุโส" (Senior Software Architect) เชี่ยวชาญ Google Apps Script',
+'หน้าที่ของคุณ: จากรายงานวิเคราะห์ความต้องการ ให้ออกแบบ "พิมพ์เขียวสถาปัตยกรรม" ของระบบที่ประกอบด้วย 3 ไฟล์: Code.gs (Backend), Index.html (Frontend), mockdata.gs (ข้อมูลทดสอบ) ภาษาไทย ตามหัวข้อต่อไปนี้เป๊ะ:',
+'1. ภาพรวมสถาปัตยกรรม (Architecture Overview) และ Data Flow ระหว่าง 3 ไฟล์',
+'2. แบบแผน Code.gs: รายชื่อฟังก์ชันทั้งหมด เรียงตามหมวด (Setup / Auth / API / Utils) พร้อมหน้าที่ พารามิเตอร์ และค่าที่ส่งกลับ',
+'3. แบบแผน Index.html: โครงสร้างหน้าจอ คอมโพเนนต์ UI ทุกส่วน ธีมสี ฟังก์ชัน JavaScript ฝั่งไคลเอนต์ และการเรียก google.script.run ครบทุกจุด',
+'4. แบบแผน mockdata.gs: ชีตทั้งหมดที่ต้องสร้าง โครงสร้างคอลัมน์ จำนวนระเบียน และกฎความสมจริงของข้อมูล',
+'5. มาตรฐานการเขียนโค้ดเพื่อการสอน: คอมเมนต์ภาษาไทยทุกฟังก์ชัน ตั้งชื่ออ่านง่าย แบ่ง Section ชัดเจน',
+'ออกแบบให้ละเอียดพอที่นักพัฒนาจะเขียนโค้ดจริงได้โดยไม่ต้องตัดสินใจเพิ่มเองเลย'
+].join('\n');
+
+/* ---------- เฟสที่ 3: วิศวกร Prompt ระดับมาสเตอร์ ---------- */
+const PHASE3_SYSTEM = [
+'คุณคือ "วิศวกร Prompt ระดับมาสเตอร์" (Master Prompt Engineer)',
+'หน้าที่ของคุณ: รวม "รายงานวิเคราะห์ความต้องการ" และ "พิมพ์เขียวสถาปัตยกรรม" ให้กลายเป็น Master Prompt ภาษาไทย 1 ชุด ที่จะนำไปวางในแชท AI เพื่อสั่งให้ AI ตัวนั้นสร้างระบบจริง',
+'Master Prompt ต้องมีโครงสร้าง 7 ส่วนตามลำดับนี้เป๊ะ:',
+'',
+'ส่วนที่ 1 — บทบาท: สั่งให้ AI สวมบทบาท "นักพัฒนา Google Apps Script อาวุโส 10 ปี"',
+'ส่วนที่ 2 — ภารกิจ: สร้างระบบตามชื่อที่กำหนด บน Google Apps Script แบบ Web App (doGet)',
+'ส่วนที่ 3 — ข้อกำหนดระบบฉบับเต็ม: ถ่ายทอดจากรายงานวิเคราะห์ทั้งหมด (ผู้ใช้และสิทธิ์, เอนทิตี้, เวิร์กโฟลว์, Edge Cases)',
+'ส่วนที่ 4 — สถาปัตยกรรมบังคับใช้: ถ่ายทอดจากพิมพ์เขียว (รายชื่อฟังก์ชัน Code.gs, โครงหน้าจอ Index.html, ชีตและข้อมูลของ mockdata.gs)',
+'ส่วนที่ 5 — พิธีส่งมอบไฟล์ (ส่วนสำคัญที่สุด ต้องเขียนตรงตามกฎนี้ทุกตัวอักษร):',
+'  ▸ ต้องสร้างโค้ดทั้งหมด 3 ไฟล์ ตามลำดับ: (1) Code.gs → (2) Index.html → (3) mockdata.gs',
+'  ▸ ทันทีที่ได้รับ Master Prompt นี้ ให้เริ่มส่งไฟล์ที่ 1: Code.gs โค้ดเต็ม 100% ทันที',
+'  ▸ เมื่อส่งไฟล์ใดเสร็จ ต้องหยุด และพิมพ์บรรทัดสุดท้ายว่า: >>> พิมพ์ "ต่อไป" เพื่อรับไฟล์ถัดไป [ชื่อไฟล์ถัดไป] เท่านั้น ห้ามส่งไฟล์ถัดไปโดยอัตโนมัติเด็ดขาด',
+'  ▸ เมื่อผู้ใช้พิมพ์ "ต่อไป" ครั้งที่ 1 → ส่งไฟล์ที่ 2: Index.html โค้ดเต็ม 100%',
+'  ▸ เมื่อผู้ใช้พิมพ์ "ต่อไป" ครั้งที่ 2 → ส่งไฟล์ที่ 3: mockdata.gs โค้ดเต็ม 100% (ไว้รันเพื่อสร้างข้อมูลสมมุติสำหรับทดสอบระบบ)',
+'  ▸ เมื่อส่งครบทั้ง 3 ไฟล์ จึงสรุปวิธีติดตั้ง (สร้างโปรเจกต์ Apps Script, วาง 3 ไฟล์, รัน mockdata.gs ก่อน, Deploy เป็น Web App) แล้วจบการทำงาน',
+'ส่วนที่ 6 — กฎเหล็กต่อต้านความขี้เกียจ (Anti-Laziness Rules): ห้ามใช้ Placeholder ห้ามเขียนว่า "โค้ดเดิม..." ห้ามย่อ ห้ามตัด ห้ามข้ามส่วนใดทั้งสิ้น ทุกไฟล์ต้องครบถ้วนและรันได้จริงทันที',
+'ส่วนที่ 7 — เช็คลิสต์ตรวจสอบก่อนส่งมอบทุกไฟล์ และมาตรฐานคุณภาพ (คอมเมนต์ภาษาไทยละเอียด จัดระเบียบโค้ด เหมาะกับการสอนนักเรียนทำตามได้เป๊ะ)',
+'',
+'กฎของคุณ: ตอบกลับด้วย Master Prompt เท่านั้น ไม่มีคำนำ ไม่มีคำอธิบายท้าย เริ่มบรรทัดแรกด้วย "🎯 MASTER PROMPT:" ทันที'
+].join('\n');
+
+/* ---------- เรียก Gemini API ---------- */
+async function callGemini(model, apiKey, system, user, maxTokens, temperature){
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + encodeURIComponent(apiKey);
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      systemInstruction:{ parts:[{ text: system }] },
+      contents:[{ role:'user', parts:[{ text: user }] }],
+      generationConfig:{ temperature: temperature, maxOutputTokens: maxTokens }
+    })
+  });
+  if(!res.ok){
+    let msg = 'HTTP ' + res.status;
+    try{ const e = await res.json(); msg = (e && e.error && e.error.message) || msg; }catch(_){}
+    if(res.status === 400 && /API key/i.test(msg)) throw new Error('API Key ไม่ถูกต้อง — กรุณาตรวจสอบที่ aistudio.google.com');
+    if(res.status === 429) throw new Error('เกินโควตาการใช้งาน (429) — รอสักครู่แล้วลองใหม่ หรือเปลี่ยนไปใช้โมเดล Flash');
+    if(res.status === 403) throw new Error('API Key นี้ไม่มีสิทธิ์เรียกโมเดลดังกล่าว (403)');
+    throw new Error('Gemini API ผิดพลาด: ' + msg);
+  }
+  const data = await res.json();
+  const cand = data && data.candidates && data.candidates[0];
+  const text = ((cand && cand.content && cand.content.parts) || []).map(p => p.text || '').join('').trim();
+  if(!text){
+    const reason = (cand && cand.finishReason) || (data && data.promptFeedback && data.promptFeedback.blockReason) || 'ไม่ทราบสาเหตุ';
+    throw new Error('AI ตอบกลับว่างเปล่า (finishReason: ' + reason + ') — ลองอีกครั้งหรือเปลี่ยนโมเดล');
+  }
+  return text;
+}
+
+/* ---------- ประกอบคำสั่งผู้ใช้แต่ละเฟส ---------- */
+function getFormData(){
+  return {
+    systemName: $('systemName').value.trim(),
+    users: $('users').value.trim(),
+    description: $('description').value.trim(),
+    complexity: $('complexity').value,
+    complexityLabel: $('complexity').options[$('complexity').selectedIndex].text.split('—')[0].trim(),
+    features: Array.from(document.querySelectorAll('.feature-check:checked')).map(c => c.value),
+    mockRows: $('mockRows').options[$('mockRows').selectedIndex].text,
+    apiKey: $('apiKey').value.trim(),
+    model: $('model').value
+  };
+}
+function buildPhase1User(d){
+  return [
+    'โปรดวิเคราะห์ความต้องการของระบบต่อไปนี้อย่างลึกซึ้ง:', '',
+    '【ชื่อระบบ】' + d.systemName,
+    '【กลุ่มผู้ใช้งาน】' + d.users,
+    '【ระดับความซับซ้อนเป้าหมาย】' + d.complexityLabel,
+    '【ฟีเจอร์เสริมที่ต้องมี】' + (d.features.length ? d.features.join(' / ') : 'ไม่ได้ระบุ — ให้คุณเป็นผู้เสนอฟีเจอร์ที่จำเป็นเอง'),
+    '【คำอธิบายการทำงานจากผู้ใช้】', d.description, '',
+    'หมายเหตุ: วิเคราะห์ให้ลึกกว่าที่เขียนมา จับใจความที่แฝงอยู่ เติมสิ่งที่จำเป็นซึ่งผู้ใช้อาจลืมระบุ'
+  ].join('\n');
+}
+function buildPhase2User(d){
+  return 'จากรายงานวิเคราะห์ความต้องการด้านล่างนี้ โปรดออกแบบพิมพ์เขียวสถาปัตยกรรมของระบบ 3 ไฟล์ (Code.gs / Index.html / mockdata.gs)\nโดย mockdata.gs ต้องสร้างข้อมูลสมมุติประมาณ ' + d.mockRows + ' ต่อชีตหลัก\n\n===== รายงานวิเคราะห์ความต้องการ =====\n' + state.analysis;
+}
+function buildPhase3User(d){
+  return [
+    'โปรดสังเคราะห์ Master Prompt จาก 2 เอกสารด้านล่างนี้', '',
+    'บริบทเพิ่มเติม: Master Prompt นี้ใช้สอนนักเรียน จึงต้องเข้มงวดกับพิธีส่งมอบ 3 ไฟล์และคำสั่ง "ต่อไป" อย่างที่ระบุในกฎของคุณ และ mockdata.gs ต้องสร้างข้อมูลสมมุติประมาณ ' + d.mockRows + ' ต่อชีตหลัก', '',
+    '===== เอกสารที่ 1: รายงานวิเคราะห์ความต้องการ =====', state.analysis, '',
+    '===== เอกสารที่ 2: พิมพ์เขียวสถาปัตยกรรม =====', state.plan
+  ].join('\n');
+}
+
+/* ---------- UI Helpers ---------- */
+function setStep(n, phase, text){
+  const el = $('step'+n), st = $('status'+n);
+  el.className = 'pstep ' + phase;
+  st.textContent = text;
+}
+function fillStep(n, text){ $('out'+n).style.display=''; $('pre'+n).textContent = text; }
+function log(html, cls){
+  const line = document.createElement('div');
+  line.className = 'logline' + (cls ? ' ' + cls : '');
+  line.innerHTML = html;
+  $('tbody').appendChild(line);
+  $('tbody').scrollTop = $('tbody').scrollHeight;
+}
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function resetAll(){
+  ['1','2','3'].forEach(n => { setStep(n,'waiting','รอคำสั่ง'); $('out'+n).style.display='none'; $('pre'+n).textContent=''; });
+  $('tbody').innerHTML = '<span class="logline">ยังไม่มีผลลัพธ์ — กรอกข้อมูลด้านซ้ายแล้วกด <b>"เริ่มกระบวนการสร้าง Master Prompt"</b></span>';
+  $('meta').textContent = ''; $('actions').style.display='none'; $('guide').style.display='none';
+  state.analysis=''; state.plan=''; state.master='';
+}
+function typewriter(text, done){
+  const el = $('tbody'); el.textContent = '';
+  let i = 0;
+  const chunk = Math.max(4, Math.ceil(text.length / 180));
+  const timer = setInterval(() => {
+    i = Math.min(text.length, i + chunk);
+    el.textContent = text.slice(0, i);
+    el.scrollTop = el.scrollHeight;
+    if(i >= text.length){ clearInterval(timer); done && done(); }
+  }, 16);
+}
+
+/* ---------- กระบวนการหลัก 3 เฟส ---------- */
+async function runPipeline(){
+  if(state.running) return;
+  const d = getFormData();
+  if(!d.systemName || !d.users || !d.description){ toast('กรุณากรอกชื่อระบบ ผู้ใช้งาน และคำอธิบายให้ครบ'); return; }
+  if(!d.apiKey){ toast('กรุณากรอก Gemini API Key'); return; }
+  if($('rememberKey').checked){ localStorage.setItem('pa_api_key', d.apiKey); } else { localStorage.removeItem('pa_api_key'); }
+
+  state.running = true;
+  const btn = $('generateBtn');
+  btn.disabled = true; btn.textContent = '⏳ กำลังประมวลผล...';
+  resetAll();
+  const t0 = Date.now();
+
+  try{
+    /* เฟส 1: วิเคราะห์ */
+    setStep(1,'running','กำลังวิเคราะห์...');
+    log('🔍 <b>เฟส 1/3</b> — นักวิเคราะห์ระบบกำลังสืบเสาะห์ความต้องการของ "' + d.systemName + '"...');
+    state.analysis = await callGemini(d.model, d.apiKey, PHASE1_SYSTEM, buildPhase1User(d), 32768, 0.35);
+    fillStep(1, state.analysis);
+    setStep(1,'done','วิเคราะห์เสร็จ ✓');
+    log('✅ พบประเด็นสำคัญแล้ว → ส่งต่อให้สถาปนิกออกแบบต่อ', 'okline');
+
+    /* เฟส 2: วางแผน */
+    setStep(2,'running','กำลังออกแบบ...');
+    log('🏗️ <b>เฟส 2/3</b> — สถาปนิกกำลังออกแบบพิมพ์เขียว 3 ไฟล์ (Code.gs / Index.html / mockdata.gs)...');
+    state.plan = await callGemini(d.model, d.apiKey, PHASE2_SYSTEM, buildPhase2User(d), 32768, 0.45);
+    fillStep(2, state.plan);
+    setStep(2,'done','ออกแบบเสร็จ ✓');
+    log('✅ พิมพ์เขียวพร้อม → เข้าสู่การสังเคราะห์คำสั่งสุดท้าย', 'okline');
+
+    /* เฟส 3: สังเคราะห์ Master Prompt */
+    setStep(3,'running','กำลังสังเคราะห์...');
+    log('✍️ <b>เฟส 3/3</b> — วิศวกร Prompt กำลังรวมทุกอย่างเป็น Master Prompt...');
+    state.master = await callGemini(d.model, d.apiKey, PHASE3_SYSTEM, buildPhase3User(d), 65536, 0.7);
+    setStep(3,'done','สร้างเสร็จ ✓');
+    log('🎉 เสร็จสมบูรณ์! Master Prompt พร้อมใช้งาน (ใช้เวลา ' + ((Date.now()-t0)/1000).toFixed(1) + ' วินาที)', 'okline');
+
+    typewriter(state.master, () => {
+      $('meta').textContent = 'ความยาว: ' + state.master.length.toLocaleString() + ' อักขระ (~' + Math.ceil(state.master.length/4).toLocaleString() + ' tokens)';
+      $('actions').style.display='flex';
+      $('guide').style.display='';
+    });
+  }catch(err){
+    ['1','2','3'].forEach(n => { if($('step'+n).classList.contains('running')){ setStep(n,'error','ผิดพลาด ✗'); } });
+    log('❌ ' + err.message, 'errline');
+    toast('เกิดข้อผิดพลาด — ดูรายละเอียดในหน้าต่างผลลัพธ์');
+  }finally{
+    state.running = false;
+    btn.disabled = false; btn.textContent = '🚀 เริ่มกระบวนการสร้าง Master Prompt';
+  }
+}
+
+/* ---------- ปุ่มต่างๆ ---------- */
+async function copyMaster(){
+  if(!state.master) return;
+  try{ await navigator.clipboard.writeText(state.master); toast('คัดลอก Master Prompt แล้ว! ไปวางใน AI ได้เลย'); }
+  catch(_){
+    const ta = document.createElement('textarea');
+    ta.value = state.master; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('คัดลอก Master Prompt แล้ว!'); }
+    catch(e){ toast('คัดลอกไม่สำเร็จ — ลองเลือกข้อความเอง'); }
+    ta.remove();
+  }
+}
+function downloadMaster(){
+  if(!state.master) return;
+  const name = ($('systemName').value.trim() || 'system').replace(/[\\/:*?"<>|]/g,'');
+  const blob = new Blob(['===== MASTER PROMPT (สร้างโดย Prompt Architect Pro) =====\n\n' + state.master], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'master-prompt-' + name + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('ดาวน์โหลดไฟล์แล้ว');
+}
+
+$('generateBtn').addEventListener('click', runPipeline);
+$('copyBtn').addEventListener('click', copyMaster);
+$('downloadBtn').addEventListener('click', downloadMaster);
+$('resetBtn').addEventListener('click', () => { resetAll(); toast('ล้างผลลัพธ์แล้ว'); });
+$('sampleBtn').addEventListener('click', () => {
+  $('systemName').value = 'ระบบยืม-คืนหนังสือห้องสมุดโรงเรียน';
+  $('users').value = 'ครูห้องสมุด (แอดมิน), นักเรียน (ผู้ใช้ทั่วไป), ผู้บริหาร (ดูรายงาน)';
+  $('description').value = 'ครูห้องสมุดบันทึกการยืมหนังสือของนักเรียน ระบบคำนวณวันครบกำหนดคืนอัตโนมัติ (7 วัน) และแจ้งสถานะเกินกำหนด\nเมื่อนักเรียนคืนหนังสือ ครูทำเครื่องหมายจ่าย สถานะหนังสือกลับเป็นพร้อมยืม\nผู้บริหารดู Dashboard สถิติหนังสือยืมมากสุด และรายชื่อผู้เกินกำหนด\nมีการค้นหาหนังสือ และตรวจสอบห้ามยืมเกิน 3 เล่มต่อคน';
+  toast('ใส่ข้อมูลตัวอย่างแล้ว ลองกดสร้างดูได้เลย');
+});
+
+/* โหลด API Key ที่จำไว้ */
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('pa_api_key');
+  if(saved){ $('apiKey').value = saved; $('rememberKey').checked = true; }
+});
+</script>
+</body>
+</html>
